@@ -1,13 +1,13 @@
 const std = @import("std");
 const water_sorter = @import("water_sorter");
+const zigimg = @import("zigimg");
 const fs = std.fs;
 const heap = std.heap;
 const math = std.math;
 const process = std.process;
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
-const zigimg = @import("zigimg");
-const Image = water_sorter.Image;
+const Image = zigimg.Image;
 
 fn getImg(alloc: Allocator) !Image {
     var exe = process.Child.init(&.{ "adb", "exec-out", "screencap", "-p" }, alloc);
