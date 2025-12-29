@@ -5,11 +5,11 @@ const heap = std.heap;
 const math = std.math;
 const process = std.process;
 const ArrayList = std.ArrayList;
+const Allocator = std.mem.Allocator;
+const zigimg = @import("zigimg");
+const Image = water_sorter.Image;
 
-pub fn main() !void {
-    var debug_alloc = heap.DebugAllocator(.{}).init;
-    const alloc = debug_alloc.allocator();
-
+fn getImg(alloc: Allocator) !Image {
     var exe = process.Child.init(&.{ "adb", "exec-out", "screencap", "-p" }, alloc);
     var out = ArrayList(u8).empty;
     defer out.deinit(alloc);
@@ -20,12 +20,21 @@ pub fn main() !void {
     exe.stderr_behavior = .Pipe;
     try exe.spawn();
     try exe.collectOutput(alloc, &out, &err, math.maxInt(usize));
-
-    var w_buffer: [1024]u8 = undefined;
-    var writer = std.fs.File.stdout().writer(&w_buffer);
-
-    _ = try writer.interface.writeAll(out.items);
     _ = try exe.wait();
+
+    const image = try Image.fromMemory(alloc, out.items);
+
+    return image;
+}
+
+pub fn main() !void {
+    var debug_alloc = heap.DebugAllocator(.{}).init;
+    const alloc = debug_alloc.allocator();
+
+    const img = try getImg(alloc);
+    for (img.pixels.rgb24) |pixel| {
+        std.debug.print("{} {} {}\n", .{ pixel.r, pixel.g, pixel.b });
+    }
 }
 
 // test "simple test" {

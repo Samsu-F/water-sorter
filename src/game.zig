@@ -3,7 +3,7 @@ const Self = @This();
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const Segment = u8;
+const Segment = u24;
 const Tube = struct { segments: [4]Segment };
 
 allocator: Allocator,

@@ -2,7 +2,7 @@
 const std = @import("std");
 const Game = @import("game.zig");
 const zigimg = @import("zigimg");
-const Image = zigimg.Image;
+pub const Image = zigimg.Image;
 
 pub fn parseGame(img: Image) !Game {
     _ = img;
