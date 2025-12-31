@@ -1,8 +1,7 @@
-//! By convention, root.zig is the root source file when making a library.
 const std = @import("std");
-const Game = @import("game.zig");
 const zigimg = @import("zigimg");
-pub const Image = zigimg.Image;
+const Game = @import("game.zig");
+const Image = zigimg.Image;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
