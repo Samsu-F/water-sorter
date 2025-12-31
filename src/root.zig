@@ -37,9 +37,10 @@ pub fn parseGame(alloc: Allocator, img: *Image) !Game {
     var tubes = ArrayList(Game.Tube).empty;
 
     var y: usize = 730;
-    while (y < img.*.height and y < 2000) : (y += 496) {
+    while (y < img.*.height and y < 1850) : (y += 496) {
         var x: usize = 0;
         while (x < img.*.width) : (x += 4) {
+            // std.debug.print("checking color at {}/{}\n", .{ x, y });
             const color: u24 = rgb(img, x, y);
             if (is_wall_color(color)) {
                 const x_continue_search: usize = x + 156;
@@ -48,6 +49,7 @@ pub fn parseGame(alloc: Allocator, img: *Image) !Game {
                     y -= 4; // go to top of tube (top edge of top segment)
                 }
                 const top_edge: usize = y + 68;
+                y += 300;
                 while (!is_wall_color(rgb(img, x, y + 1))) {
                     y += 1;
                 }
@@ -67,6 +69,11 @@ pub fn parseGame(alloc: Allocator, img: *Image) !Game {
                                     segment_color = t.segments[i];
                                 }
                             }
+                        }
+                    }
+                    for (0..segment_idx) |i| {
+                        if (colors_are_similar(segment_color, tube.segments[i])) {
+                            segment_color = tube.segments[i];
                         }
                     }
                     tube.segments[segment_idx] = segment_color;
@@ -90,6 +97,7 @@ pub fn parseGame(alloc: Allocator, img: *Image) !Game {
                     }
                 }
             }
+            // std.debug.print("color #{x:06} occurs {} times\n", .{ color, color_count });
             if (color == 0) {
                 std.debug.assert(color_count == 8); // exactly 8 empty segments
             } else {
