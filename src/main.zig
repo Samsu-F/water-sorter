@@ -1,40 +1,33 @@
 const std = @import("std");
 const parser = @import("parser.zig");
-const zigimg = @import("zigimg");
-const fs = std.fs;
-const heap = std.heap;
-const math = std.math;
-const process = std.process;
-const ArrayList = std.ArrayList;
+const solver = @import("solver.zig");
+const Game = @import("game.zig");
+const Image = @import("zigimg").Image;
 const Allocator = std.mem.Allocator;
-const Image = zigimg.Image;
-
-fn getImg(alloc: Allocator) !Image {
-    var exe = process.Child.init(&.{ "adb", "exec-out", "screencap", "-p" }, alloc);
-    var out = ArrayList(u8).empty;
-    defer out.deinit(alloc);
-    var err = ArrayList(u8).empty;
-    defer err.deinit(alloc);
-
-    exe.stdout_behavior = .Pipe;
-    exe.stderr_behavior = .Pipe;
-    try exe.spawn();
-    try exe.collectOutput(alloc, &out, &err, math.maxInt(usize));
-
-    const image = try Image.fromMemory(alloc, out.items);
-
-    return image;
-}
 
 pub fn main() !void {
-    var debug_alloc = heap.DebugAllocator(.{}).init;
+    var debug_alloc = std.heap.DebugAllocator(.{}).init;
     defer _ = debug_alloc.deinit();
     const alloc = debug_alloc.allocator();
 
     var img = try getImg(alloc);
+    defer img.deinit(alloc);
     var game = try parser.parseGame(alloc, &img);
-    img.deinit(alloc);
-    game.deinit();
+    defer game.deinit();
+}
+
+fn getImg(alloc: Allocator) !Image {
+    var exe = std.process.Child.init(&.{ "adb", "exec-out", "screencap", "-p" }, alloc);
+    exe.stdout_behavior = .Pipe;
+    try exe.spawn();
+
+    var poller = std.io.poll(alloc, enum { stdout }, .{ .stdout = exe.stdout.? });
+    defer poller.deinit();
+    const reader = poller.reader(.stdout);
+    while (try poller.poll()) {}
+    _ = try exe.wait();
+
+    return Image.fromMemory(alloc, reader.buffer[0..reader.end]);
 }
 
 // test "simple test" {
