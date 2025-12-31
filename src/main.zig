@@ -12,6 +12,9 @@ pub fn main() !void {
 
     var game = try parser.parseGame(alloc, try getImg(alloc));
     defer game.deinit();
+    var moves = try solver.bfsSolve(game);
+    defer moves.deinit(alloc);
+    std.debug.print("Main: solution = {any}\n", .{moves.items});
 }
 
 fn getImg(alloc: Allocator) !Image {

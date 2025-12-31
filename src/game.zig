@@ -72,9 +72,12 @@ pub const GameView = struct {
         return .{ .tubes = try alloc.dupe(Tube, self.tubes) };
     }
 
-    pub fn format(self: *const GameView, w: *std.io.Writer) !void {
+    pub fn format(self: *const Self, w: *std.io.Writer) !void {
         for (self.tubes) |tube| {
-            try w.print("{any}\n", .{tube.segments});
+            for (tube.segments) |segment| {
+                try w.print("#{x:06} ", .{segment});
+            }
+            try w.writeByte('\n');
         }
     }
 
