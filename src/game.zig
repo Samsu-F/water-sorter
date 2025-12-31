@@ -83,3 +83,14 @@ pub fn format(self: *const Self, w: *std.io.Writer) !void {
         try w.print("{any}\n", .{tube.segments});
     }
 }
+
+pub fn is_solved(self: Self) bool {
+    for (self.tubes) |tube| {
+        for (1..Tube.N_SEGMENTS) |i| {
+            if (tube.segments[i] != tube.segments[0]) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
