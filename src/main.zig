@@ -10,9 +10,7 @@ pub fn main() !void {
     defer _ = debug_alloc.deinit();
     const alloc = debug_alloc.allocator();
 
-    var img = try getImg(alloc);
-    defer img.deinit(alloc);
-    var game = try parser.parseGame(alloc, &img);
+    var game = try parser.parseGame(alloc, try getImg(alloc));
     defer game.deinit();
 }
 
