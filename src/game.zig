@@ -30,7 +30,7 @@ pub const Tube = struct {
         } else return null;
     }
 
-    pub fn try_tranfer(self: *Tube, other: *Tube, comptime execute: bool) bool {
+    pub fn try_transfer(self: *Tube, other: *Tube, comptime execute: bool) bool {
         if (self == other) return false;
 
         if (self.top()) |i| {

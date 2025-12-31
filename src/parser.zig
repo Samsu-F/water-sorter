@@ -5,8 +5,8 @@ const Image = zigimg.Image;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
-fn rgb(img: *Image, x: usize, y: usize) u24 {
-    return @bitCast(img.*.pixels.bgr24[x + y * img.*.width]);
+fn rgb(img: Image, x: usize, y: usize) u24 {
+    return @bitCast(img.pixels.bgr24[x + y * img.width]);
 }
 
 fn colors_are_similar(c1: u24, c2: u24) bool {
@@ -17,7 +17,7 @@ fn colors_are_similar(c1: u24, c2: u24) bool {
     const g2: i24 = (@as(i24, @bitCast(c2 & 0xff00))) >> 8;
     const b1: i24 = (@as(i24, @bitCast(c1 & 0xff)));
     const b2: i24 = (@as(i24, @bitCast(c2 & 0xff)));
-    return @abs(r1 - r2) < max_accepted_diff and @abs(g1 - g2) < max_accepted_diff and @abs(b1 - b2) < max_accepted_diff;
+    return @max(@abs(r1 - r2), @abs(g1 - g2), @abs(b1 - b2)) < max_accepted_diff;
 }
 
 fn is_wall_color(color: u24) bool {
@@ -30,7 +30,6 @@ fn is_bg_color(color: u24) bool {
 
 pub fn parseGame(alloc: Allocator, img: *Image) !Game {
     try img.convert(alloc, .bgr24);
-    defer img.deinit(alloc);
     std.debug.print("height x width: {} x {}\n", .{ img.*.height, img.*.width });
 
     var tubes = ArrayList(Game.Tube).empty;
@@ -40,16 +39,16 @@ pub fn parseGame(alloc: Allocator, img: *Image) !Game {
         var x: usize = 0;
         while (x < img.*.width) : (x += 4) {
             // std.debug.print("checking color at {}/{}\n", .{ x, y });
-            const color: u24 = rgb(img, x, y);
+            const color: u24 = rgb(img.*, x, y);
             if (is_wall_color(color)) {
                 const x_continue_search: usize = x + 156;
                 x += 50;
-                while (!is_wall_color(rgb(img, x, y - 4))) {
+                while (!is_wall_color(rgb(img.*, x, y - 4))) {
                     y -= 4; // go to top of tube (top edge of top segment)
                 }
                 const top_edge: usize = y + 68;
                 y += 300;
-                while (!is_wall_color(rgb(img, x, y + 1))) {
+                while (!is_wall_color(rgb(img.*, x, y + 1))) {
                     y += 1;
                 }
                 const bottom_edge: usize = y;
@@ -58,7 +57,7 @@ pub fn parseGame(alloc: Allocator, img: *Image) !Game {
                 tube.tap_position = .{ .x = x, .y = (top_edge + bottom_edge) / 2 };
                 for (0..4) |segment_idx| {
                     const segment_y_center: usize = top_edge + (2 * segment_idx + 1) * (bottom_edge - top_edge) / 8;
-                    var segment_color: u24 = rgb(img, x, segment_y_center);
+                    var segment_color: u24 = rgb(img.*, x, segment_y_center);
                     if (is_bg_color(segment_color)) {
                         segment_color = 0;
                     } else {

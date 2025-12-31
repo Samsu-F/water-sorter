@@ -33,7 +33,7 @@ pub fn main() !void {
 
     var img = try getImg(alloc);
     var game = try parser.parseGame(alloc, &img);
-    // _ = game;
+    img.deinit(alloc);
     game.deinit();
 }
 
