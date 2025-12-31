@@ -67,6 +67,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    b.installArtifact(exe);
 
     // This creates a top level step. Top level steps have a name and can be
     // invoked by name when running `zig build` (e.g. `zig build run`).
@@ -83,6 +84,7 @@ pub fn build(b: *std.Build) void {
     // the user runs `zig build run`, so we create a dependency link.
     const run_cmd = b.addRunArtifact(exe);
     run_step.dependOn(&run_cmd.step);
+    run_cmd.step.dependOn(b.getInstallStep());
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
