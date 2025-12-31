@@ -1,6 +1,7 @@
 const std = @import("std");
 const Game = @import("game.zig");
 const ArrayList = std.ArrayList;
+const HashSet = std.AutoHashMap(Game, void);
 
 pub fn Queue(comptime T: type) type {
     return struct {
@@ -74,7 +75,10 @@ pub fn bfsSolve(game: Game) !ArrayList(Move) {
             move_list.deinit(game.allocator);
         }
     }
+    var known_game_states = HashSet.init(game.allocator);
+    defer known_game_states.deinit();
     try queue.enqueue(.{ try game.dupe(), ArrayList(Move).empty });
+    try known_game_states.put(game, {});
     debug_enqueue_count += 1;
     while (queue.dequeue()) |elem| {
         var g, var move_list = elem;
@@ -99,7 +103,7 @@ pub fn bfsSolve(game: Game) !ArrayList(Move) {
                     empty_target_tried = true;
                 }
                 if (move_list.getLastOrNull()) |last_move| {
-                    if(i_source == last_move.target) {
+                    if (i_source == last_move.target) {
                         continue; // never make a move that pours out what was just poured in
                     }
                 }
@@ -109,10 +113,15 @@ pub fn bfsSolve(game: Game) !ArrayList(Move) {
                 if (tube_source.try_transfer(tube_target, false)) {
                     var g_copy = try g.dupe();
                     _ = g_copy.tubes[i_source].try_transfer(&g_copy.tubes[i_target], true);
-                    var move_list_copy = try move_list.clone(g.allocator);
-                    try move_list_copy.append(g.allocator, .{ .source = i_source, .target = i_target });
-                    try queue.enqueue(.{ g_copy, move_list_copy });
-                    debug_enqueue_count += 1;
+                    if (!known_game_states.contains(g_copy)) {
+                        known_game_states.put(g_copy, {});
+                        var move_list_copy = try move_list.clone(g.allocator);
+                        try move_list_copy.append(g.allocator, .{ .source = i_source, .target = i_target });
+                        try queue.enqueue(.{ g_copy, move_list_copy });
+                        debug_enqueue_count += 1;
+                    } else {
+                        g_copy.deinit();
+                    }
                 }
             }
         }
