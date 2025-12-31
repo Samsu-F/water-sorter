@@ -1,5 +1,5 @@
 const std = @import("std");
-const water_sorter = @import("water_sorter");
+const parser = @import("parser.zig");
 const zigimg = @import("zigimg");
 const fs = std.fs;
 const heap = std.heap;
@@ -32,7 +32,7 @@ pub fn main() !void {
     const alloc = debug_alloc.allocator();
 
     var img = try getImg(alloc);
-    var game = try water_sorter.parseGame(alloc, &img);
+    var game = try parser.parseGame(alloc, &img);
     // _ = game;
     game.deinit();
 }
