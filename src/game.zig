@@ -75,12 +75,15 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn dupe(self: Self) !Self {
-    return .{ .allocator = self.allocator, .tubes = self.allocator.dupe(Tube, self.tubes) };
+    return .{ .allocator = self.allocator, .tubes = try self.allocator.dupe(Tube, self.tubes) };
 }
 
 pub fn format(self: *const Self, w: *std.io.Writer) !void {
     for (self.tubes) |tube| {
-        try w.print("{any}\n", .{tube.segments});
+        for (tube.segments) |segment| {
+            try w.print("#{x:06} ", .{segment});
+        }
+        try w.writeByte('\n');
     }
 }
 
