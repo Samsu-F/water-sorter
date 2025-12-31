@@ -20,7 +20,6 @@ fn getImg(alloc: Allocator) !Image {
     exe.stderr_behavior = .Pipe;
     try exe.spawn();
     try exe.collectOutput(alloc, &out, &err, math.maxInt(usize));
-    _ = try exe.wait();
 
     const image = try Image.fromMemory(alloc, out.items);
 
@@ -29,12 +28,13 @@ fn getImg(alloc: Allocator) !Image {
 
 pub fn main() !void {
     var debug_alloc = heap.DebugAllocator(.{}).init;
+    defer _ = debug_alloc.deinit();
     const alloc = debug_alloc.allocator();
 
-    const img = try getImg(alloc);
-    for (img.pixels.rgb24) |pixel| {
-        std.debug.print("{} {} {}\n", .{ pixel.r, pixel.g, pixel.b });
-    }
+    var img = try getImg(alloc);
+    var game = try water_sorter.parseGame(alloc, &img);
+    // _ = game;
+    game.deinit();
 }
 
 // test "simple test" {

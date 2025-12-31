@@ -3,8 +3,11 @@ const Self = @This();
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const Segment = u24;
-const Tube = struct { segments: [4]Segment };
+pub const Segment = u24;
+pub const Tube = struct {
+    segments: [4]Segment,
+    tap_position: struct { x: usize, y: usize },
+};
 
 allocator: Allocator,
 tubes: []Tube,
