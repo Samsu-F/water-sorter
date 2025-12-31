@@ -1,10 +1,8 @@
-//! By convention, root.zig is the root source file when making a library.
 const std = @import("std");
-const Game = @import("game.zig");
 const zigimg = @import("zigimg");
-pub const Image = zigimg.Image;
+const Game = @import("game.zig");
 
-pub fn parseGame(img: Image) !Game {
+pub fn parseGame(img: *zigimg.Image) !Game {
     _ = img;
     unreachable;
 }
