@@ -4,6 +4,7 @@ const solver = @import("solver.zig");
 const Game = @import("game.zig");
 const Image = @import("zigimg").Image;
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 
 pub fn main() !void {
     var debug_alloc = std.heap.DebugAllocator(.{}).init;
@@ -15,6 +16,7 @@ pub fn main() !void {
     var moves = try solver.bfsSolve(game);
     defer moves.deinit(alloc);
     std.debug.print("Main: solution = {any}\n", .{moves.items});
+    try executeSolution(game, moves);
 }
 
 fn getImg(alloc: Allocator) !Image {
@@ -29,6 +31,28 @@ fn getImg(alloc: Allocator) !Image {
     _ = try exe.wait();
 
     return Image.fromMemory(alloc, reader.buffer[0..reader.end]);
+}
+
+fn executeSolution(game: Game, move_list: ArrayList(solver.Move)) !void {
+    for (move_list.items) |move| {
+        const x1: usize = game.tubes[move.source].tap_position.x;
+        const y1: usize = game.tubes[move.source].tap_position.y;
+        const x2: usize = game.tubes[move.target].tap_position.x;
+        const y2: usize = game.tubes[move.target].tap_position.y;
+        try adbTap(game.allocator, x1, y1);
+        try adbTap(game.allocator, x2, y2);
+    }
+}
+
+fn adbTap(alloc: Allocator, x: usize, y: usize) !void {
+
+    var x_string: [10]u8 = undefined;
+    var y_string: [10]u8 = undefined;
+    const x_length = std.fmt.printInt(&x_string, x, 10, .lower, .{});
+    const y_length = std.fmt.printInt(&y_string, y, 10, .lower, .{});
+    var exe = std.process.Child.init(&.{ "adb", "shell", "input", "touchscreen", "tap", x_string[0..x_length], y_string[0..y_length] }, alloc);
+    try exe.spawn();
+    _ = try exe.wait();
 }
 
 // test "simple test" {
