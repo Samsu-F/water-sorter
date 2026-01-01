@@ -3,14 +3,14 @@ const zigimg = @import("zigimg");
 const Game = @import("game.zig");
 const Tube = Game.Tube;
 const Image = zigimg.Image;
-const Bgr24 = zigimg.color.Bgr24;
+const Rgb24 = zigimg.color.Rgb24;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 const Color = struct {
     const Self = @This();
 
-    val: Bgr24,
+    val: Rgb24,
 
     const Wall1 = Self{ .val = .{ .r = 0xd6, .g = 0xc6, .b = 0xde } };
     const Wall2 = Self{ .val = .{ .r = 0x4a, .g = 0x41, .b = 0x5a } };
@@ -19,12 +19,12 @@ const Color = struct {
     const Black = Self{ .val = .{ .r = 0, .g = 0, .b = 0 } };
 
     fn fromImage(img: Image, x: usize, y: usize) Self {
-        std.debug.assert(img.pixelFormat() == .bgr24);
-        return .{ .val = img.pixels.bgr24[x + y * img.width] };
+        std.debug.assert(img.pixelFormat() == .rgb24);
+        return .{ .val = img.pixels.rgb24[x + y * img.width] };
     }
 
     fn toU24(self: Self) u24 {
-        return @bitCast(self.val);
+        return @byteSwap(@as(u24, @bitCast(self.val)));
     }
 
     fn isSimilar(self: Self, other: Self) bool {
@@ -73,7 +73,7 @@ const ColorCache = struct {
 pub fn parseGame(alloc: Allocator, image: Image) !Game {
     var img = image;
     defer img.deinit(alloc);
-    try img.convert(alloc, .bgr24);
+    try img.convert(alloc, .rgb24);
     std.log.debug("height x width: {} x {}\n", .{ img.height, img.width });
 
     var tubes = ArrayList(Tube).empty;
@@ -97,7 +97,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                 var y_bottom = y_top + 300;
                 while (!Color.fromImage(img, x_center, y_bottom).isWallColor()) y_bottom += 4;
 
-                std.log.debug("Tube from {}/{} to {}/{}\n", .{ x_center, y_top, x_center, y_bottom });
+                std.log.debug("Tube from {}/{} to {}/{}", .{ x_center, y_top, x_center, y_bottom });
                 const dy = y_bottom - y_top;
                 const y_center = y_top + dy / 2;
                 var tube = Tube{ .segments = undefined, .tap_position = .{ .x = x_center, .y = y_center } };
@@ -107,7 +107,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                     segment_color = if (segment_color.isBgColor()) .Black else try cache.getSimilar(segment_color);
 
                     segment.* = segment_color.toU24();
-                    std.log.debug("{}/{}:\t#{x:06}\n", .{ x_center, segment_y_center, segment_color.toU24() });
+                    std.log.debug("{:04}/{:04}: #{x:06}", .{ x_center, segment_y_center, segment_color.toU24() });
                 }
                 try tubes.append(alloc, tube);
 
@@ -124,7 +124,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                 if (s == color.toU24()) count += 1;
             }
         }
-        std.log.debug("color #{x:06} occurs {} times\n", .{ color.toU24(), count });
+        std.log.debug("color #{x:06} occurs {} times", .{ color.toU24(), count });
         if (color.toU24() == Color.Black.toU24()) {
             std.debug.assert(count == 8); // exactly 8 empty segments
         } else {
