@@ -48,7 +48,7 @@ pub fn Queue(comptime T: type) type {
     };
 }
 
-const Move = struct { source: usize, target: usize };
+pub const Move = struct { source: usize, target: usize };
 
 // pub fn solveGame(game: Game) void {
 //     // var graph = std.AutoHashMap(*Game, std.AutoHashMap(struct { usize, usize }, *Game)).init(game.allocator);
