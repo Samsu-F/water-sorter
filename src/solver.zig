@@ -103,6 +103,9 @@ pub fn bfsSolve(game: Game) !ArrayList(Move) {
                         continue; // never make a move that pours out what was just poured in
                     }
                 }
+                if (tube_source.colorCount() == 1 and tube_target.colorCount() == 1 and i_source > i_target) {
+                    continue; // only pour from lower to higher if the results are equivalent
+                }
                 if (tube_source.try_transfer(tube_target, false)) {
                     var g_copy = try g.dupe();
                     _ = g_copy.tubes[i_source].try_transfer(&g_copy.tubes[i_target], true);
