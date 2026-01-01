@@ -58,14 +58,14 @@ const ColorCache = struct {
         self.colors.deinit(self.alloc);
     }
 
-    fn getSimilar(self: *Self, new_color: Color) !Color {
-        for (self.colors.items) |col| {
+    fn getSimilar(self: *Self, new_color: Color) !usize {
+        for (self.colors.items, 0..) |col, i| {
             if (col.isSimilar(new_color)) {
-                return col;
+                return i;
             }
         } else {
             try self.colors.append(self.alloc, new_color);
-            return new_color;
+            return self.colors.items.len - 1;
         }
     }
 };
@@ -78,6 +78,9 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
 
     var tubes = ArrayList(Tube).empty;
     errdefer tubes.deinit(alloc);
+    var positions = ArrayList(Game.Point).empty;
+    errdefer positions.deinit(alloc);
+
     var cache = ColorCache.init(alloc);
     defer cache.deinit();
 
@@ -100,16 +103,17 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                 std.log.debug("Tube from {}/{} to {}/{}", .{ x_center, y_top, x_center, y_bottom });
                 const dy = y_bottom - y_top;
                 const y_center = y_top + dy / 2;
-                var tube = Tube{ .segments = undefined, .tap_position = .{ .x = x_center, .y = y_center } };
+                var tube: Tube = undefined;
                 for (&tube.segments, 0..) |*segment, idx| {
                     const segment_y_center = y_top + (2 * idx + 1) * dy / 8;
-                    var segment_color = Color.fromImage(img, x_center, segment_y_center);
-                    segment_color = if (segment_color.isBgColor()) .Black else try cache.getSimilar(segment_color);
+                    const segment_color = Color.fromImage(img, x_center, segment_y_center);
+                    const color_index = if (segment_color.isBgColor()) 0 else try cache.getSimilar(segment_color) + 1;
+                    segment.* = @intCast(color_index);
 
-                    segment.* = segment_color.toU24();
                     std.log.debug("{:04}/{:04}: #{x:06}", .{ x_center, segment_y_center, segment_color.toU24() });
                 }
                 try tubes.append(alloc, tube);
+                try positions.append(alloc, .{ .x = x_center, .y = y_center });
 
                 x += 156;
                 y = y_center;
@@ -117,22 +121,24 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
         }
     }
 
-    for (cache.colors.items) |color| {
+    for (0..cache.colors.items.len + 1) |i| {
         var count: usize = 0;
         for (tubes.items) |t| {
             for (t.segments) |s| {
-                if (s == color.toU24()) count += 1;
+                if (s == i) count += 1;
             }
         }
-        std.log.debug("color #{x:06} occurs {} times", .{ color.toU24(), count });
-        if (color.toU24() == Color.Black.toU24()) {
+        var color: u24 = 0;
+        if (i == 0) {
             std.debug.assert(count == 8); // exactly 8 empty segments
         } else {
             std.debug.assert(count == 4); // each color occurs exactly 4 times
+            color = cache.colors.items[i - 1].toU24();
         }
+        std.log.debug("color #{x:06} occurs {} times", .{ color, count });
     }
 
-    return Game.init(alloc, try tubes.toOwnedSlice(alloc));
+    return Game.init(alloc, try tubes.toOwnedSlice(alloc), try positions.toOwnedSlice(alloc));
 }
 
 // test "basic add functionality" {

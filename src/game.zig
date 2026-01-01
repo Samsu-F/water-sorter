@@ -78,13 +78,16 @@ pub const Tube = struct {
 
 pub const GameView = struct {
     tubes: []Tube,
-    // parent: *Self, TODO
 
     pub fn dupe(self: GameView, alloc: Allocator) !GameView {
         return .{ .tubes = try alloc.dupe(Tube, self.tubes) };
     }
 
-    pub fn format(self: *const Self, w: *std.io.Writer) !void {
+    pub fn deinit(self: *GameView, alloc: Allocator) void {
+        alloc.free(self.tubes);
+    }
+
+    pub fn format(self: *const GameView, w: *std.io.Writer) !void {
         for (self.tubes) |tube| {
             for (tube.segments) |segment| {
                 try w.print("#{x:06} ", .{segment});
@@ -115,6 +118,6 @@ pub fn deinit(self: *Self) void {
     self.allocator.free(self.positions);
 }
 
-pub fn view(self: *Self) GameView {
+pub fn view(self: Self) GameView {
     return .{ .tubes = self.tubes };
 }
