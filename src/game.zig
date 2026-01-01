@@ -3,17 +3,16 @@ const Self = @This();
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-pub const Segment = u24;
+pub const Segment = u8;
+
+pub const Point = struct { x: usize, y: usize };
 
 pub const Tube = struct {
     pub const N_SEGMENTS = 4;
-
-    segments: [N_SEGMENTS]Segment,
-    tap_position: struct { x: usize, y: usize },
-
-    // const empty = Tube{ .segments = .{0} ** N_SEGMENTS };
     const top_type = std.math.IntFittingRange(0, N_SEGMENTS);
     const bottom_type = std.math.IntFittingRange(0, N_SEGMENTS + 1);
+
+    segments: [N_SEGMENTS]Segment,
 
     fn top(self: Tube) ?top_type {
         for (self.segments, 0..) |s, i| {
@@ -65,34 +64,42 @@ pub const Tube = struct {
     }
 };
 
+pub const GameView = struct {
+    tubes: []Tube,
+    // parent: *Self, TODO
+
+    pub fn dupe(self: GameView, alloc: Allocator) !GameView {
+        return .{ .tubes = try alloc.dupe(Tube, self.tubes) };
+    }
+
+    pub fn format(self: *const GameView, w: *std.io.Writer) !void {
+        for (self.tubes) |tube| {
+            try w.print("{any}\n", .{tube.segments});
+        }
+    }
+
+    pub fn is_solved(self: GameView) bool {
+        for (self.tubes) |tube| {
+            for (tube.segments[1..]) |s| {
+                if (s != tube.segments[0]) return false;
+            }
+        } else return true;
+    }
+};
+
 allocator: Allocator,
 tubes: []Tube,
+positions: []Point,
 
-pub fn init(alloc: Allocator, tubes: []Tube) Self {
-    return .{ .allocator = alloc, .tubes = tubes };
+pub fn init(alloc: Allocator, tubes: []Tube, positions: []Point) Self {
+    return .{ .allocator = alloc, .tubes = tubes, .positions = positions };
 }
 
 pub fn deinit(self: *Self) void {
     self.allocator.free(self.tubes);
+    self.allocator.free(self.positions);
 }
 
-pub fn dupe(self: Self) !Self {
-    return .{ .allocator = self.allocator, .tubes = try self.allocator.dupe(Tube, self.tubes) };
-}
-
-pub fn format(self: *const Self, w: *std.io.Writer) !void {
-    for (self.tubes) |tube| {
-        try w.print("{any}\n", .{tube.segments});
-    }
-}
-
-pub fn is_solved(self: Self) bool {
-    for (self.tubes) |tube| {
-        for (tube.segments[1..]) |s| {
-            if (s != tube.segments[0]) {
-                return false;
-            }
-        }
-    }
-    return true;
+pub fn view(self: *Self) GameView {
+    return .{ .tubes = self.tubes };
 }
