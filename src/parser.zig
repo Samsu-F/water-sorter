@@ -107,7 +107,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                     segment_color = if (segment_color.isBgColor()) .Black else try cache.getSimilar(segment_color);
 
                     segment.* = segment_color.toU24();
-                    std.log.debug("{}/{}:\t#{}\n", .{ x_center, segment_y_center, segment_color });
+                    std.log.debug("{}/{}:\t#{x:06}\n", .{ x_center, segment_y_center, segment_color.toU24() });
                 }
                 try tubes.append(alloc, tube);
 
@@ -124,7 +124,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                 if (s == color.toU24()) count += 1;
             }
         }
-        std.log.debug("color {} occurs {} times\n", .{ color, count });
+        std.log.debug("color #{x:06} occurs {} times\n", .{ color.toU24(), count });
         if (color.toU24() == Color.Black.toU24()) {
             std.debug.assert(count == 8); // exactly 8 empty segments
         } else {
