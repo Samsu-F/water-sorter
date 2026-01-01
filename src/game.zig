@@ -11,9 +11,11 @@ pub const Tube = struct {
     segments: [N_SEGMENTS]Segment,
     tap_position: struct { x: usize, y: usize },
 
-    const empty = Tube{ .segments = .{0} ** N_SEGMENTS };
+    // const empty = Tube{ .segments = .{0} ** N_SEGMENTS };
+    const top_type = std.math.IntFittingRange(0, N_SEGMENTS);
+    const bottom_type = std.math.IntFittingRange(0, N_SEGMENTS + 1);
 
-    fn top(self: Tube) ?u2 {
+    fn top(self: Tube) ?top_type {
         for (self.segments, 0..) |s, i| {
             if (s != 0) {
                 return @intCast(i);
@@ -21,7 +23,7 @@ pub const Tube = struct {
         } else return null;
     }
 
-    fn bottom(self: Tube, top_i: u2) ?u4 {
+    fn bottom(self: Tube, top_i: top_type) ?bottom_type {
         const val = self.segments[top_i];
         for (top_i..N_SEGMENTS) |i| {
             if (self.segments[i] != val) {
@@ -43,7 +45,7 @@ pub const Tube = struct {
 
                 if (j != 0 and v1 == v2) {
                     if (execute) {
-                        const usable: u4 = @min(b - i, j);
+                        const usable: bottom_type = @min(b - i, j);
 
                         @memmove(other.segments[j - usable .. j], self.segments[i .. i + usable]);
                         @memset(self.segments[i .. i + usable], 0);
@@ -75,7 +77,7 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn dupe(self: Self) !Self {
-    return .{ .allocator = self.allocator, .tubes = self.allocator.dupe(Tube, self.tubes) };
+    return .{ .allocator = self.allocator, .tubes = try self.allocator.dupe(Tube, self.tubes) };
 }
 
 pub fn format(self: *const Self, w: *std.io.Writer) !void {
@@ -86,8 +88,8 @@ pub fn format(self: *const Self, w: *std.io.Writer) !void {
 
 pub fn is_solved(self: Self) bool {
     for (self.tubes) |tube| {
-        for (1..Tube.N_SEGMENTS) |i| {
-            if (tube.segments[i] != tube.segments[0]) {
+        for (tube.segments[1..]) |s| {
+            if (s != tube.segments[0]) {
                 return false;
             }
         }
