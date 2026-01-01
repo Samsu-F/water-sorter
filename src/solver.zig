@@ -1,7 +1,25 @@
 const std = @import("std");
 const Game = @import("game.zig");
 const ArrayList = std.ArrayList;
-const HashSet = std.AutoHashMap(Game, void);
+const Allocator = std.mem.Allocator;
+const HashSet = std.HashMap(Game.GameView, void, Context, std.hash_map.default_max_load_percentage);
+const Context = struct {
+    pub fn hash(_: Context, gameview: Game.GameView) u64 {
+        var hasher = std.hash.Wyhash.init(0);
+        std.hash.autoHashStrat(&hasher, gameview, .Deep);
+        return hasher.final();
+    }
+
+    pub fn eql(_: Context, gv1: Game.GameView, gv2: Game.GameView) bool {
+        for (gv1.tubes, gv2.tubes) |t1, t2| {
+            if (!std.mem.eql(Game.Segment, &t1.segments, &t2.segments)) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
 
 pub fn Queue(comptime T: type) type {
     return struct {
@@ -65,31 +83,34 @@ pub const Move = struct { source: usize, target: usize };
 //     }
 // }
 
-pub fn bfsSolve(game: Game) !ArrayList(Move) {
-    var debug_enqueue_count: usize = 0;
-    var queue = Queue(struct { Game, ArrayList(Move) }).init(game.allocator);
+pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
+    var queue = Queue(struct { Game.GameView, ArrayList(Move) }).init(alloc);
     defer {
         while (queue.dequeue()) |elem| {
-            var g, var move_list = elem;
-            g.deinit();
-            move_list.deinit(game.allocator);
+            var move_list = elem.@"1";
+            move_list.deinit(alloc);
         }
     }
-    var known_game_states = HashSet.init(game.allocator);
-    defer known_game_states.deinit();
-    try queue.enqueue(.{ try game.dupe(), ArrayList(Move).empty });
-    try known_game_states.put(game, {});
-    debug_enqueue_count += 1;
+    var known_game_states = HashSet.init(alloc);
+    defer {
+        var iterator = known_game_states.keyIterator();
+        while (iterator.next()) |g| {
+            g.deinit(alloc);
+        }
+        known_game_states.deinit();
+    }
+    const gameview_copy = try gameview.dupe(alloc);
+    try queue.enqueue(.{ gameview_copy, ArrayList(Move).empty });
+    try known_game_states.put(gameview_copy, {});
     while (queue.dequeue()) |elem| {
         var g, var move_list = elem;
-        std.log.debug("{f}\n{any}\ndebug_enqueue_count = {}\n\n", .{ g, move_list.items, debug_enqueue_count });
-        defer g.deinit();
-        errdefer move_list.deinit(game.allocator);
+        std.log.debug("{f}\n{any}\nknown_game_states.count() == {}\n\n", .{ g, move_list.items, known_game_states.count() });
+        errdefer move_list.deinit(alloc);
         if (g.is_solved()) {
-            std.log.debug("found solution after {} enqueue operations\n", .{debug_enqueue_count});
+            std.log.debug("found solution after {} enqueue operations\n", .{known_game_states.count()});
             return move_list;
         }
-        defer move_list.deinit(game.allocator);
+        defer move_list.deinit(alloc);
         for (g.tubes, 0..) |*tube_source, i_source| {
             var empty_target_tried: bool = false;
             for (g.tubes, 0..) |*tube_target, i_target| {
@@ -111,16 +132,15 @@ pub fn bfsSolve(game: Game) !ArrayList(Move) {
                     continue; // only pour from lower to higher if the results are equivalent
                 }
                 if (tube_source.try_transfer(tube_target, false)) {
-                    var g_copy = try g.dupe();
+                    var g_copy = try g.dupe(alloc);
                     _ = g_copy.tubes[i_source].try_transfer(&g_copy.tubes[i_target], true);
                     if (!known_game_states.contains(g_copy)) {
-                        known_game_states.put(g_copy, {});
-                        var move_list_copy = try move_list.clone(g.allocator);
-                        try move_list_copy.append(g.allocator, .{ .source = i_source, .target = i_target });
+                        try known_game_states.put(g_copy, {});
+                        var move_list_copy = try move_list.clone(alloc);
+                        try move_list_copy.append(alloc, .{ .source = i_source, .target = i_target });
                         try queue.enqueue(.{ g_copy, move_list_copy });
-                        debug_enqueue_count += 1;
                     } else {
-                        g_copy.deinit();
+                        g_copy.deinit(alloc);
                     }
                 }
             }
