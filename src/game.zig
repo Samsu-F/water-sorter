@@ -62,6 +62,18 @@ pub const Tube = struct {
 
         return false;
     }
+
+    pub fn colorCount(self: Tube) usize {
+        var color_count: usize = 0;
+        var current_color: u24 = 0;
+        for (self.segments) |segment| {
+            if (segment != current_color) {
+                color_count += 1;
+                current_color = segment;
+            }
+        }
+        return color_count;
+    }
 };
 
 pub const GameView = struct {

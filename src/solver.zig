@@ -57,7 +57,7 @@ const Move = struct { source: usize, target: usize };
 //         for (game.tubes, 0..) |*t2, j| {
 //             // if (i != j) {
 //             if (t1.try_transfer(t2, false)) {
-//                 std.debug.print("{} {}\n", .{ i, j });
+//                 std.log.debug("{} {}\n", .{ i, j });
 //             }
 //             // }
 //         }
@@ -65,6 +65,7 @@ const Move = struct { source: usize, target: usize };
 // }
 
 pub fn bfsSolve(game: Game) !ArrayList(Move) {
+    var debug_enqueue_count: usize = 0;
     var queue = Queue(struct { Game, ArrayList(Move) }).init(game.allocator);
     defer {
         while (queue.dequeue()) |elem| {
@@ -74,23 +75,41 @@ pub fn bfsSolve(game: Game) !ArrayList(Move) {
         }
     }
     try queue.enqueue(.{ try game.dupe(), ArrayList(Move).empty });
+    debug_enqueue_count += 1;
     while (queue.dequeue()) |elem| {
         var g, var move_list = elem;
-        // std.debug.print("{f}\n{any}\n\n", .{g, move_list.items});
+        std.log.debug("{f}\n{any}\ndebug_enqueue_count = {}\n\n", .{ g, move_list.items, debug_enqueue_count });
         defer g.deinit();
         errdefer move_list.deinit(game.allocator);
         if (g.is_solved()) {
+            std.log.debug("found solution after {} enqueue operations\n", .{debug_enqueue_count});
             return move_list;
         }
         defer move_list.deinit(game.allocator);
         for (g.tubes, 0..) |*tube_source, i_source| {
+            var empty_target_tried: bool = false;
             for (g.tubes, 0..) |*tube_target, i_target| {
+                if (tube_target.colorCount() == 0) {
+                    if (tube_source.colorCount() <= 1) {
+                        continue; // pouring the whole content of a tube to an empty tube never makes sense
+                    }
+                    if (empty_target_tried) {
+                        continue; // enqueue at most one move with empty target per source
+                    }
+                    empty_target_tried = true;
+                }
+                if (move_list.getLastOrNull()) |last_move| {
+                    if(i_source == last_move.target) {
+                        continue; // never make a move that pours out what was just poured in
+                    }
+                }
                 if (tube_source.try_transfer(tube_target, false)) {
                     var g_copy = try g.dupe();
                     _ = g_copy.tubes[i_source].try_transfer(&g_copy.tubes[i_target], true);
                     var move_list_copy = try move_list.clone(g.allocator);
                     try move_list_copy.append(g.allocator, .{ .source = i_source, .target = i_target });
                     try queue.enqueue(.{ g_copy, move_list_copy });
+                    debug_enqueue_count += 1;
                 }
             }
         }
