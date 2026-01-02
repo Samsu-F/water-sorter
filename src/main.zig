@@ -40,9 +40,9 @@ fn executeSolution(game: Game, move_list: ArrayList(solver.Move)) !void {
         const y1: usize = game.positions[move.source].y;
         const x2: usize = game.positions[move.target].x;
         const y2: usize = game.positions[move.target].y;
-        DebugUtils.print("tapping at {}/{} ", .{x1, y1});
+        DebugUtils.print("tapping at {:4}/{:4} ", .{x1, y1});
         try adbTap(game.allocator, x1, y1);
-        DebugUtils.print("and at {}/{}\n", .{x2, y2});
+        DebugUtils.print("and at {:4}/{:4}\n", .{x2, y2});
         try adbTap(game.allocator, x2, y2);
     }
 }

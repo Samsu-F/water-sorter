@@ -90,7 +90,7 @@ pub const GameView = struct {
     pub fn format(self: *const GameView, w: *std.io.Writer) !void {
         for (self.tubes) |tube| {
             for (tube.segments) |segment| {
-                try w.print("#{x:06} ", .{segment});
+                try w.print("{} ", .{segment});
             }
             try w.writeByte('\n');
         }

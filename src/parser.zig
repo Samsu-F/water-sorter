@@ -101,7 +101,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                 var y_bottom = y_top + 300;
                 while (!Color.fromImage(img, x_center, y_bottom).isWallColor()) y_bottom += 4;
 
-                DebugUtils.print("Tube from {}/{} to {}/{}", .{ x_center, y_top, x_center, y_bottom });
+                DebugUtils.print("\nTube from {:4}/{:4} to {:4}/{:4}\n", .{ x_center, y_top, x_center, y_bottom });
                 const dy = y_bottom - y_top;
                 const y_center = y_top + dy / 2;
                 var tube: Tube = undefined;
@@ -111,7 +111,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                     const color_index = if (segment_color.isBgColor()) 0 else try cache.getSimilar(segment_color) + 1;
                     segment.* = @intCast(color_index);
 
-                    DebugUtils.print("{:04}/{:04}: #{x:06}", .{ x_center, segment_y_center, segment_color.toU24() });
+                    DebugUtils.print("At {:4}/{:4}: color #{x:06}\tindex {}\n", .{ x_center, segment_y_center, segment_color.toU24(), color_index });
                 }
                 try tubes.append(alloc, tube);
                 try positions.append(alloc, .{ .x = x_center, .y = y_center });

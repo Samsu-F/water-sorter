@@ -108,7 +108,7 @@ pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
         DebugUtils.print("{f}\n{any}\nknown_game_states.count() == {}\n\n", .{ g, move_list.items, known_game_states.count() });
         errdefer move_list.deinit(alloc);
         if (g.is_solved()) {
-            DebugUtils.print("found solution after {} enqueue operations\n", .{known_game_states.count()});
+            DebugUtils.print("found solution with {} moves after {} enqueue operations\n", .{ move_list.items.len, known_game_states.count()});
             return move_list;
         }
         defer move_list.deinit(alloc);
