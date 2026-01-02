@@ -5,14 +5,39 @@ const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const HashSet = std.HashMap(Game.GameView, void, Context, std.hash_map.default_max_load_percentage);
 const Context = struct {
+    // less-than function for sorting
+    fn compareTubes(_: void, a: Game.Tube, b: Game.Tube) bool {
+        // Lexicographic comparison
+        for (0..Game.Tube.N_SEGMENTS) |i| {
+            if (a.segments[i] < b.segments[i]) return true;
+            if (a.segments[i] > b.segments[i]) return false;
+        }
+        return false; // if all segments are equal
+    }
+
     pub fn hash(_: Context, gameview: Game.GameView) u64 {
+        var debug_alloc = std.heap.DebugAllocator(.{}).init;
+        defer _ = debug_alloc.deinit();
+        const alloc = debug_alloc.allocator();
+        var gameview_sorted_copy = gameview.dupe(alloc) catch unreachable;
+        defer gameview_sorted_copy.deinit(alloc);
+        std.mem.sort(Game.Tube, gameview_sorted_copy.tubes, {}, compareTubes);
         var hasher = std.hash.Wyhash.init(0);
-        std.hash.autoHashStrat(&hasher, gameview, .Deep);
+        std.hash.autoHashStrat(&hasher, gameview_sorted_copy, .Deep);
         return hasher.final();
     }
 
     pub fn eql(_: Context, gv1: Game.GameView, gv2: Game.GameView) bool {
-        for (gv1.tubes, gv2.tubes) |t1, t2| {
+        var debug_alloc = std.heap.DebugAllocator(.{}).init;
+        defer _ = debug_alloc.deinit();
+        const alloc = debug_alloc.allocator();
+        var gv1_sorted_copy = gv1.dupe(alloc) catch unreachable;
+        defer gv1_sorted_copy.deinit(alloc);
+        var gv2_sorted_copy = gv2.dupe(alloc) catch unreachable;
+        defer gv2_sorted_copy.deinit(alloc);
+        std.mem.sort(Game.Tube, gv1_sorted_copy.tubes, {}, compareTubes);
+        std.mem.sort(Game.Tube, gv2_sorted_copy.tubes, {}, compareTubes);
+        for (gv1_sorted_copy.tubes, gv2_sorted_copy.tubes) |t1, t2| {
             if (!std.mem.eql(Game.Segment, &t1.segments, &t2.segments)) {
                 return false;
             }
