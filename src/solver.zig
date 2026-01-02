@@ -21,12 +21,13 @@ const Context = struct {
     }
 };
 
+pub const ExtractionPolicy = enum { fifo, lifo };
 
-pub fn Queue(comptime T: type) type {
+pub fn LinearContainer(comptime T: type, comptime extraction_policy: ExtractionPolicy) type {
     return struct {
         const Self = @This();
 
-        const QueueNode: type = struct { data: T, node: std.DoublyLinkedList.Node };
+        const ContainerNode: type = struct { data: T, node: std.DoublyLinkedList.Node };
 
         allocator: std.mem.Allocator,
         list: std.DoublyLinkedList,
@@ -40,30 +41,36 @@ pub fn Queue(comptime T: type) type {
 
         pub fn deinit(self: *Self) void {
             // Free all remaining nodes
-            while (self.dequeue() != null) {}
+            while (self.pop() != null) {}
         }
 
         pub fn isEmpty(self: *Self) bool {
             return self.list.len == 0;
         }
 
-        pub fn enqueue(self: *Self, value: T) !void {
-            const qnode = try self.allocator.create(QueueNode);
-            qnode.* = .{ .data = value, .node = .{} };
-            self.list.append(&qnode.node);
+        pub fn push(self: *Self, value: T) !void {
+            const container_node = try self.allocator.create(ContainerNode);
+            container_node.* = .{ .data = value, .node = .{} };
+            self.list.append(&container_node.node);
         }
 
-        pub fn dequeue(self: *Self) ?T {
-            const node = self.list.popFirst() orelse return null;
-            const qnode: *QueueNode = @fieldParentPtr("node", node);
-            defer self.allocator.destroy(qnode);
-            return qnode.*.data;
+        pub fn pop(self: *Self) ?T {
+            const node = switch (extraction_policy) {
+                .fifo => self.list.popFirst(),
+                .lifo => self.list.pop(),
+            } orelse return null;
+            const container_node: *ContainerNode = @fieldParentPtr("node", node);
+            defer self.allocator.destroy(container_node);
+            return container_node.*.data;
         }
 
         pub fn peek(self: *Self) ?*const T {
-            const node = self.list.first orelse return null;
-            const qnode: *QueueNode = @fieldParentPtr("node", node);
-            return &qnode.*.data;
+            const node = switch (extraction_policy) {
+                .fifo => self.list.first,
+                .lifo => self.list.last,
+            } orelse return null;
+            const container_node: *ContainerNode = @fieldParentPtr("node", node);
+            return &container_node.*.data;
         }
     };
 }
@@ -84,10 +91,10 @@ pub const Move = struct { source: usize, target: usize };
 //     }
 // }
 
-pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
-    var queue = Queue(struct { Game.GameView, ArrayList(Move) }).init(alloc);
+fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container_policy: ExtractionPolicy) !ArrayList(Move) {
+    var states_to_visit = LinearContainer(struct { Game.GameView, ArrayList(Move) }, container_policy).init(alloc);
     defer {
-        while (queue.dequeue()) |elem| {
+        while (states_to_visit.pop()) |elem| {
             var move_list = elem.@"1";
             move_list.deinit(alloc);
         }
@@ -101,14 +108,14 @@ pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
         known_game_states.deinit();
     }
     const gameview_copy = try gameview.dupe(alloc);
-    try queue.enqueue(.{ gameview_copy, ArrayList(Move).empty });
+    try states_to_visit.push(.{ gameview_copy, ArrayList(Move).empty });
     try known_game_states.put(gameview_copy, {});
-    while (queue.dequeue()) |elem| {
+    while (states_to_visit.pop()) |elem| {
         var g, var move_list = elem;
         DebugUtils.print("{f}\n{any}\nknown_game_states.count() == {}\n\n", .{ g, move_list.items, known_game_states.count() });
         errdefer move_list.deinit(alloc);
         if (g.is_solved()) {
-            DebugUtils.print("found solution with {} moves after {} enqueue operations\n", .{ move_list.items.len, known_game_states.count()});
+            DebugUtils.print("found solution with {} moves after {} push operations\n", .{ move_list.items.len, known_game_states.count() });
             return move_list;
         }
         defer move_list.deinit(alloc);
@@ -120,7 +127,7 @@ pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
                         continue; // pouring the whole content of a tube to an empty tube never makes sense
                     }
                     if (empty_target_tried) {
-                        continue; // enqueue at most one move with empty target per source
+                        continue; // consider at most one move with empty target per source
                     }
                     empty_target_tried = true;
                 }
@@ -139,7 +146,7 @@ pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
                         try known_game_states.put(g_copy, {});
                         var move_list_copy = try move_list.clone(alloc);
                         try move_list_copy.append(alloc, .{ .source = i_source, .target = i_target });
-                        try queue.enqueue(.{ g_copy, move_list_copy });
+                        try states_to_visit.push(.{ g_copy, move_list_copy });
                     } else {
                         g_copy.deinit(alloc);
                     }
@@ -148,4 +155,12 @@ pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
         }
     }
     @panic("no solution");
+}
+
+pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
+    return searchTreeSolve(alloc, gameview, .fifo); // use a queue
+}
+
+pub fn dfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
+    return searchTreeSolve(alloc, gameview, .lifo); // use a stack
 }
