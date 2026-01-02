@@ -1,6 +1,7 @@
 const std = @import("std");
 const zigimg = @import("zigimg");
 const Game = @import("game.zig");
+const DebugUtils = @import("debug_utils.zig");
 const Tube = Game.Tube;
 const Image = zigimg.Image;
 const Rgb24 = zigimg.color.Rgb24;
@@ -74,7 +75,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
     var img = image;
     defer img.deinit(alloc);
     try img.convert(alloc, .rgb24);
-    std.log.debug("height x width: {} x {}\n", .{ img.height, img.width });
+    DebugUtils.print("height x width: {} x {}\n", .{ img.height, img.width });
 
     var tubes = ArrayList(Tube).empty;
     errdefer tubes.deinit(alloc);
@@ -100,7 +101,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                 var y_bottom = y_top + 300;
                 while (!Color.fromImage(img, x_center, y_bottom).isWallColor()) y_bottom += 4;
 
-                std.log.debug("Tube from {}/{} to {}/{}", .{ x_center, y_top, x_center, y_bottom });
+                DebugUtils.print("Tube from {}/{} to {}/{}", .{ x_center, y_top, x_center, y_bottom });
                 const dy = y_bottom - y_top;
                 const y_center = y_top + dy / 2;
                 var tube: Tube = undefined;
@@ -110,7 +111,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                     const color_index = if (segment_color.isBgColor()) 0 else try cache.getSimilar(segment_color) + 1;
                     segment.* = @intCast(color_index);
 
-                    std.log.debug("{:04}/{:04}: #{x:06}", .{ x_center, segment_y_center, segment_color.toU24() });
+                    DebugUtils.print("{:04}/{:04}: #{x:06}", .{ x_center, segment_y_center, segment_color.toU24() });
                 }
                 try tubes.append(alloc, tube);
                 try positions.append(alloc, .{ .x = x_center, .y = y_center });
@@ -135,7 +136,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
             std.debug.assert(count == 4); // each color occurs exactly 4 times
             color = cache.colors.items[i - 1].toU24();
         }
-        std.log.debug("color #{x:06} occurs {} times", .{ color, count });
+        DebugUtils.print("color #{x:06} occurs {} times", .{ color, count });
     }
 
     return Game.init(alloc, try tubes.toOwnedSlice(alloc), try positions.toOwnedSlice(alloc));

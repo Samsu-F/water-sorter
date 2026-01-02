@@ -1,5 +1,6 @@
 const std = @import("std");
 const Game = @import("game.zig");
+const DebugUtils = @import("debug_utils.zig");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const HashSet = std.HashMap(Game.GameView, void, Context, std.hash_map.default_max_load_percentage);
@@ -76,7 +77,7 @@ pub const Move = struct { source: usize, target: usize };
 //         for (game.tubes, 0..) |*t2, j| {
 //             // if (i != j) {
 //             if (t1.try_transfer(t2, false)) {
-//                 std.log.debug("{} {}\n", .{ i, j });
+//                 DebugUtils.print("{} {}\n", .{ i, j });
 //             }
 //             // }
 //         }
@@ -104,10 +105,10 @@ pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
     try known_game_states.put(gameview_copy, {});
     while (queue.dequeue()) |elem| {
         var g, var move_list = elem;
-        std.log.debug("{f}\n{any}\nknown_game_states.count() == {}\n\n", .{ g, move_list.items, known_game_states.count() });
+        DebugUtils.print("{f}\n{any}\nknown_game_states.count() == {}\n\n", .{ g, move_list.items, known_game_states.count() });
         errdefer move_list.deinit(alloc);
         if (g.is_solved()) {
-            std.log.debug("found solution after {} enqueue operations\n", .{known_game_states.count()});
+            DebugUtils.print("found solution after {} enqueue operations\n", .{known_game_states.count()});
             return move_list;
         }
         defer move_list.deinit(alloc);

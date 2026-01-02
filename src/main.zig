@@ -2,6 +2,7 @@ const std = @import("std");
 const parser = @import("parser.zig");
 const solver = @import("solver.zig");
 const Game = @import("game.zig");
+const DebugUtils = @import("debug_utils.zig");
 const Image = @import("zigimg").Image;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
@@ -15,7 +16,7 @@ pub fn main() !void {
     defer game.deinit();
     var moves = try solver.bfsSolve(alloc, game.view());
     defer moves.deinit(alloc);
-    std.debug.print("Main: solution = {any}\n", .{moves.items});
+    DebugUtils.print("Main: solution = {any}\n", .{moves.items});
     try executeSolution(game, moves);
 }
 
@@ -39,9 +40,9 @@ fn executeSolution(game: Game, move_list: ArrayList(solver.Move)) !void {
         const y1: usize = game.positions[move.source].y;
         const x2: usize = game.positions[move.target].x;
         const y2: usize = game.positions[move.target].y;
-        std.debug.print("tapping at {}/{} ", .{x1, y1});
+        DebugUtils.print("tapping at {}/{} ", .{x1, y1});
         try adbTap(game.allocator, x1, y1);
-        std.debug.print("and at {}/{}\n", .{x2, y2});
+        DebugUtils.print("and at {}/{}\n", .{x2, y2});
         try adbTap(game.allocator, x2, y2);
     }
 }
