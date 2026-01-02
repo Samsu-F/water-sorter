@@ -40,22 +40,24 @@ fn executeSolution(game: Game, move_list: ArrayList(solver.Move)) !void {
         const y1: usize = game.positions[move.source].y;
         const x2: usize = game.positions[move.target].x;
         const y2: usize = game.positions[move.target].y;
-        DebugUtils.print("tapping at {:4}/{:4} ", .{x1, y1});
-        try adbTap(game.allocator, x1, y1);
-        DebugUtils.print("and at {:4}/{:4}\n", .{x2, y2});
-        try adbTap(game.allocator, x2, y2);
+        DebugUtils.print("tapping at {:4}/{:4} ", .{ x1, y1 });
+        var tap1 = try adbTap(game.allocator, x1, y1);
+        std.Thread.sleep(200 * std.time.ns_per_ms);
+        DebugUtils.print("and at {:4}/{:4}\n", .{ x2, y2 });
+        var tap2 = try adbTap(game.allocator, x2, y2);
+        _ = try tap1.wait();
+        _ = try tap2.wait();
     }
 }
 
-fn adbTap(alloc: Allocator, x: usize, y: usize) !void {
-
+fn adbTap(alloc: Allocator, x: usize, y: usize) !std.process.Child {
     var x_string: [10]u8 = undefined;
     var y_string: [10]u8 = undefined;
     const x_length = std.fmt.printInt(&x_string, x, 10, .lower, .{});
     const y_length = std.fmt.printInt(&y_string, y, 10, .lower, .{});
     var exe = std.process.Child.init(&.{ "adb", "shell", "input", "touchscreen", "tap", x_string[0..x_length], y_string[0..y_length] }, alloc);
     try exe.spawn();
-    _ = try exe.wait();
+    return exe;
 }
 
 // test "simple test" {
