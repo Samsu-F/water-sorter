@@ -145,24 +145,11 @@ fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container
         }
         defer move_list.deinit(alloc);
         for (g.tubes, 0..) |*tube_source, i_source| {
-            var empty_target_tried: bool = false;
             for (g.tubes, 0..) |*tube_target, i_target| {
-                if (tube_target.colorCount() == 0) {
-                    if (tube_source.colorCount() <= 1) {
-                        continue; // pouring the whole content of a tube to an empty tube never makes sense
-                    }
-                    if (empty_target_tried) {
-                        continue; // consider at most one move with empty target per source
-                    }
-                    empty_target_tried = true;
-                }
                 if (move_list.getLastOrNull()) |last_move| {
                     if (i_source == last_move.target) {
                         continue; // never make a move that pours out what was just poured in
                     }
-                }
-                if (tube_source.colorCount() == 1 and tube_target.colorCount() == 1 and i_source > i_target) {
-                    continue; // only pour from lower to higher if the results are equivalent
                 }
                 if (tube_source.try_transfer(tube_target, false)) {
                     var g_copy = try g.dupe(alloc);
