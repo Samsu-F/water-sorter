@@ -150,6 +150,12 @@ fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container
                     if (i_source == last_move.target) {
                         continue; // never make a move that pours out what was just poured in
                     }
+                    if (g.tubes[last_move.source].topSegment() == g.tubes[last_move.target].topSegment()) {
+                        // if last move was a partial pour of multiple segments of the same color
+                        if (last_move.source != i_source) {
+                            continue; // partial pour must be continued, otherwise it did not make sense
+                        }
+                    }
                 }
                 if (tube_source.try_transfer(tube_target, false)) {
                     var g_copy = try g.dupe(alloc);
