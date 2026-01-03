@@ -13,14 +13,16 @@ const Color = struct {
 
     val: Rgb24,
 
-    const Wall1 = Self{ .val = .{ .r = 0xd6, .g = 0xc6, .b = 0xde } };
-    const Wall2 = Self{ .val = .{ .r = 0x4a, .g = 0x41, .b = 0x5a } };
+    const Wall = Self{ .val = .{ .r = 0xd6, .g = 0xc6, .b = 0xde } };
     const Bg1 = Self{ .val = .{ .r = 0x21, .g = 0x18, .b = 0x29 } };
     const Bg2 = Self{ .val = .{ .r = 0x29, .g = 0x20, .b = 0x3a } };
     const Black = Self{ .val = .{ .r = 0, .g = 0, .b = 0 } };
 
     fn fromImage(img: Image, x: usize, y: usize) Self {
+        // DebugUtils.print("getting color at pixel {:4}/{:4}\t(width x height = {} x {})\n", .{ x, y, img.width, img.height });
         std.debug.assert(img.pixelFormat() == .rgb24);
+        std.debug.assert(0 <= x and x < img.width);
+        std.debug.assert(0 <= y and y < img.height);
         return .{ .val = img.pixels.rgb24[x + y * img.width] };
     }
 
@@ -29,7 +31,7 @@ const Color = struct {
     }
 
     fn isSimilar(self: Self, other: Self) bool {
-        const max_accepted_diff = 15;
+        const max_accepted_diff = 12;
         const dr = @abs(@as(i8, @bitCast(self.val.r -% other.val.r)));
         const dg = @abs(@as(i8, @bitCast(self.val.g -% other.val.g)));
         const db = @abs(@as(i8, @bitCast(self.val.b -% other.val.b)));
@@ -37,7 +39,7 @@ const Color = struct {
     }
 
     fn isWallColor(self: Self) bool {
-        return self.isSimilar(Wall1) or self.isSimilar(Wall2);
+        return self.isSimilar(Wall);
     }
 
     fn isBgColor(self: Self) bool {
@@ -62,6 +64,7 @@ const ColorCache = struct {
     fn getSimilar(self: *Self, new_color: Color) !usize {
         for (self.colors.items, 0..) |col, i| {
             if (col.isSimilar(new_color)) {
+                DebugUtils.print("new color #{x:06} is similar to existing color #{x:06} (index {})\n", .{ new_color.toU24(), col.toU24(), i });
                 return i;
             }
         } else {
@@ -95,11 +98,16 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
 
                 // go to top of tube (top edge of top segment)
                 var y_top = y;
-                while (!Color.fromImage(img, x_center, y_top).isWallColor()) y_top -= 4;
-                y_top += 72;
+                while (Color.fromImage(img, x, y_top).isWallColor()) {
+                    y_top -= 4;
+                }
+                y_top += 44;
 
                 var y_bottom = y_top + 300;
-                while (!Color.fromImage(img, x_center, y_bottom).isWallColor()) y_bottom += 4;
+                while (Color.fromImage(img, x, y_bottom).isWallColor()) {
+                    y_bottom += 4;
+                }
+                y_bottom += 36;
 
                 DebugUtils.print("\nTube from {:4}/{:4} to {:4}/{:4}\n", .{ x_center, y_top, x_center, y_bottom });
                 const dy = y_bottom - y_top;
@@ -129,15 +137,16 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                 if (s == i) count += 1;
             }
         }
-        var color: u24 = 0;
         if (i == 0) {
-            std.debug.assert(count == 8); // exactly 8 empty segments
+            DebugUtils.print("\nempty segment occurs {} times\n", .{count});
+            std.debug.assert(count % Game.Tube.N_SEGMENTS == 0); // empty segments sum up to a whole number of tubes
         } else {
-            std.debug.assert(count == 4); // each color occurs exactly 4 times
-            color = cache.colors.items[i - 1].toU24();
+            const color = cache.colors.items[i - 1].toU24();
+            DebugUtils.print("color #{x:06} occurs {} times\n", .{ color, count });
+            std.debug.assert(count == Game.Tube.N_SEGMENTS); // each color sums up to exactly one tube
         }
-        DebugUtils.print("color #{x:06} occurs {} times", .{ color, count });
     }
+    DebugUtils.print("\n", .{});
 
     return Game.init(alloc, try tubes.toOwnedSlice(alloc), try positions.toOwnedSlice(alloc));
 }
