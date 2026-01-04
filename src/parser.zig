@@ -26,6 +26,32 @@ const Color = struct {
         return .{ .val = img.pixels.rgb24[x + y * img.width] };
     }
 
+    // returns the average pixel value of a square centered at x/y
+    fn fromImageLocalAvg(img: Image, x: usize, y: usize, radius: usize) Self {
+        const TypeOfR: type = @TypeOf(@as(Self, undefined).val.r);
+        const square_side_length: usize = radius * 2 + 1;
+        const n: usize = square_side_length * square_side_length;
+        var sum_r: u64 = 0;
+        var sum_g: u64 = 0;
+        var sum_b: u64 = 0;
+        std.debug.assert(n <= std.math.maxInt(@TypeOf(sum_r)) / std.math.maxInt(TypeOfR));
+        var i: usize = 0;
+        for (x - radius..x + radius + 1) |x_a| {
+            for (y - radius..y + radius + 1) |y_a| {
+                const color = fromImage(img, x_a, y_a);
+                sum_r += color.val.r;
+                sum_g += color.val.g;
+                sum_b += color.val.b;
+                i += 1;
+            }
+        }
+        std.debug.assert(i == n);
+        const r: TypeOfR = @intCast(sum_r / n);
+        const g: TypeOfR = @intCast(sum_g / n);
+        const b: TypeOfR = @intCast(sum_b / n);
+        return Self{ .val = .{ .r = r, .g = g, .b = b } };
+    }
+
     fn toU24(self: Self) u24 {
         return @byteSwap(@as(u24, @bitCast(self.val)));
     }
@@ -115,7 +141,7 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
                 var tube: Tube = undefined;
                 for (&tube.segments, 0..) |*segment, idx| {
                     const segment_y_center = y_top + (2 * idx + 1) * dy / 8;
-                    const segment_color = Color.fromImage(img, x_center, segment_y_center);
+                    const segment_color = Color.fromImageLocalAvg(img, x_center, segment_y_center, 2);
                     const color_index = if (segment_color.isBgColor()) 0 else try cache.getSimilar(segment_color) + 1;
                     segment.* = @intCast(color_index);
 
