@@ -137,11 +137,12 @@ fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container
     try known_game_states.put(gameview_copy, {});
     while (states_to_visit.pop()) |elem| {
         var g, const move_list = elem;
-        // DebugUtils.print("{f}\n{any}\nknown_game_states.count() == {}\n\n", .{ g, move_list.items, known_game_states.count() });
+        DebugUtils.print("known_game_states.count() == {}\n", .{known_game_states.count()});
         if (g.is_solved()) {
-            // DebugUtils.print("found solution with {} moves after {} push operations\n", .{ move_list.items.len, known_game_states.count() });
             const ml = move_list orelse return ArrayList(Move).empty;
-            return ml.toArrayList(alloc);
+            const result = try ml.toArrayList(alloc);
+            DebugUtils.print("found solution with {} moves after {} push operations\n", .{ result.items.len, known_game_states.count() });
+            return result;
         }
         for (g.tubes, 0..) |*tube_source, i_source| {
             var empty_target_tried: bool = false;
