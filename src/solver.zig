@@ -77,6 +77,29 @@ pub fn LinearContainer(comptime T: type, comptime extraction_policy: ExtractionP
 
 pub const Move = struct { source: usize, target: usize };
 
+pub const MoveList = struct {
+    prev: ?*const MoveList,
+    move: Move,
+
+    fn toArrayList(self: *const MoveList, alloc: Allocator) !ArrayList(Move) {
+        var array_list = ArrayList(Move).empty;
+        var current_node: *const MoveList = self;
+        while (true) {
+            try array_list.append(alloc, current_node.*.move);
+            current_node = current_node.*.prev orelse break;
+        }
+
+        // reverse order
+        var i: usize = 0;
+        while (i < array_list.items.len - i - 1) : (i += 1) {
+            const tmp = array_list.items[i];
+            array_list.items[i] = array_list.items[array_list.items.len - i - 1];
+            array_list.items[array_list.items.len - i - 1] = tmp;
+        }
+        return array_list;
+    }
+};
+
 // pub fn solveGame(game: Game) void {
 //     // var graph = std.AutoHashMap(*Game, std.AutoHashMap(struct { usize, usize }, *Game)).init(game.allocator);
 
@@ -92,13 +115,15 @@ pub const Move = struct { source: usize, target: usize };
 // }
 
 fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container_policy: ExtractionPolicy) !ArrayList(Move) {
-    var states_to_visit = LinearContainer(struct { Game.GameView, ArrayList(Move) }, container_policy).init(alloc);
+    var states_to_visit = LinearContainer(struct { Game.GameView, ?*const MoveList }, container_policy).init(alloc);
+    defer states_to_visit.deinit();
+    var arena = std.heap.ArenaAllocator.init(alloc);
     defer {
-        while (states_to_visit.pop()) |elem| {
-            var move_list = elem.@"1";
-            move_list.deinit(alloc);
-        }
+        _ = arena.reset(.free_all);
+        arena.deinit();
     }
+    const arena_alloc = arena.allocator();
+
     var known_game_states = HashSet.init(alloc);
     defer {
         var iterator = known_game_states.keyIterator();
@@ -108,17 +133,16 @@ fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container
         known_game_states.deinit();
     }
     const gameview_copy = try gameview.dupe(alloc);
-    try states_to_visit.push(.{ gameview_copy, ArrayList(Move).empty });
+    try states_to_visit.push(.{ gameview_copy, null });
     try known_game_states.put(gameview_copy, {});
     while (states_to_visit.pop()) |elem| {
-        var g, var move_list = elem;
-        DebugUtils.print("{f}\n{any}\nknown_game_states.count() == {}\n\n", .{ g, move_list.items, known_game_states.count() });
-        errdefer move_list.deinit(alloc);
+        var g, const move_list = elem;
+        // DebugUtils.print("{f}\n{any}\nknown_game_states.count() == {}\n\n", .{ g, move_list.items, known_game_states.count() });
         if (g.is_solved()) {
-            DebugUtils.print("found solution with {} moves after {} push operations\n", .{ move_list.items.len, known_game_states.count() });
-            return move_list;
+            // DebugUtils.print("found solution with {} moves after {} push operations\n", .{ move_list.items.len, known_game_states.count() });
+            const ml = move_list orelse return ArrayList(Move).empty;
+            return ml.toArrayList(alloc);
         }
-        defer move_list.deinit(alloc);
         for (g.tubes, 0..) |*tube_source, i_source| {
             var empty_target_tried: bool = false;
             for (g.tubes, 0..) |*tube_target, i_target| {
@@ -131,7 +155,8 @@ fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container
                     }
                     empty_target_tried = true;
                 }
-                if (move_list.getLastOrNull()) |last_move| {
+                if (move_list) |ml| {
+                    const last_move: Move = ml.*.move;
                     if (i_source == last_move.target) {
                         continue; // never make a move that pours out what was just poured in
                     }
@@ -144,9 +169,10 @@ fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container
                     _ = g_copy.tubes[i_source].try_transfer(&g_copy.tubes[i_target], true);
                     if (!known_game_states.contains(g_copy)) {
                         try known_game_states.put(g_copy, {});
-                        var move_list_copy = try move_list.clone(alloc);
-                        try move_list_copy.append(alloc, .{ .source = i_source, .target = i_target });
-                        try states_to_visit.push(.{ g_copy, move_list_copy });
+                        const move_list_new = try arena_alloc.create(MoveList);
+                        move_list_new.*.prev = move_list;
+                        move_list_new.*.move = .{ .source = i_source, .target = i_target };
+                        try states_to_visit.push(.{ g_copy, move_list_new });
                     } else {
                         g_copy.deinit(alloc);
                     }
