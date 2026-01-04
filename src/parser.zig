@@ -120,17 +120,26 @@ pub fn parseGame(alloc: Allocator, image: Image) !Game {
         while (x < img.width) : (x += 4) {
             const color = Color.fromImage(img, x, y);
             if (color.isWallColor()) {
-                const x_center = x + 50;
+                var x_wall_left = x;
+                while (Color.fromImage(img, x_wall_left - 1, y).isWallColor()) {
+                    x_wall_left -= 1;
+                }
+                var x_wall_right = x;
+                while (Color.fromImage(img, x_wall_right + 1, y).isWallColor()) {
+                    x_wall_right += 1;
+                }
+                const x_wall = (x_wall_left + x_wall_right) / 2;
+                const x_center = x_wall + 50;
 
                 // go to top of tube (top edge of top segment)
                 var y_top = y;
-                while (Color.fromImage(img, x, y_top).isWallColor()) {
+                while (Color.fromImage(img, x_wall, y_top).isWallColor()) {
                     y_top -= 4;
                 }
                 y_top += 44;
 
                 var y_bottom = y_top + 300;
-                while (Color.fromImage(img, x, y_bottom).isWallColor()) {
+                while (Color.fromImage(img, x_wall, y_bottom).isWallColor()) {
                     y_bottom += 4;
                 }
                 y_bottom += 36;
