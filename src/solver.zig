@@ -3,23 +3,47 @@ const Game = @import("game.zig");
 const DebugUtils = @import("debug_utils.zig");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
-const HashSet = std.HashMap(Game.GameView, void, Context, std.hash_map.default_max_load_percentage);
+const GameView = Game.GameView;
+const HashSet = std.HashMap(GameView, void, Context, std.hash_map.default_max_load_percentage);
+
 const Context = struct {
-    pub fn hash(_: Context, gameview: Game.GameView) u64 {
-        var hasher = std.hash.Wyhash.init(0);
-        std.hash.autoHashStrat(&hasher, gameview, .Deep);
-        return hasher.final();
+    allocator: Allocator,
+
+    // less-than function for sorting
+    fn compareTubes(_: void, a: Game.Tube, b: Game.Tube) bool {
+        return std.mem.lessThan(Game.Segment, &a.segments, &b.segments);
     }
 
-    pub fn eql(_: Context, gv1: Game.GameView, gv2: Game.GameView) bool {
-        for (gv1.tubes, gv2.tubes) |t1, t2| {
-            if (!std.mem.eql(Game.Segment, &t1.segments, &t2.segments)) {
+    pub fn hash(_: Context, gameview: GameView) u64 {
+        // The overall hash is the XOR of the hashes of all the elements, which
+        // will be consistent no matter the iteration order.
+        var overall_hash: u64 = 0;
+        for (gameview.tubes) |t| {
+            var hasher = std.hash.Wyhash.init(0);
+            std.hash.autoHashStrat(&hasher, t, .Deep);
+            overall_hash ^= hasher.final();
+        }
+
+        return overall_hash;
+    }
+
+    pub fn eql(c: Context, gv1: GameView, gv2: GameView) bool {
+        var gv1_sorted_copy = gv1.dupe(c.allocator) catch unreachable;
+        defer gv1_sorted_copy.deinit(c.allocator);
+        var gv2_sorted_copy = gv2.dupe(c.allocator) catch unreachable;
+        defer gv2_sorted_copy.deinit(c.allocator);
+
+        std.mem.sort(Game.Tube, gv1_sorted_copy.tubes, {}, compareTubes);
+        std.mem.sort(Game.Tube, gv2_sorted_copy.tubes, {}, compareTubes);
+        for (gv1_sorted_copy.tubes, gv2_sorted_copy.tubes) |t1, t2| {
+            if (!std.meta.eql(t1, t2)) {
                 return false;
             }
-        }
-        return true;
+        } else return true;
     }
 };
+
+pub const Move = struct { source: usize, target: usize };
 
 pub const ExtractionPolicy = enum { fifo, lifo };
 
@@ -75,31 +99,15 @@ pub fn LinearContainer(comptime T: type, comptime extraction_policy: ExtractionP
     };
 }
 
-pub const Move = struct { source: usize, target: usize };
-
-// pub fn solveGame(game: Game) void {
-//     // var graph = std.AutoHashMap(*Game, std.AutoHashMap(struct { usize, usize }, *Game)).init(game.allocator);
-
-//     for (game.tubes, 0..) |*t1, i| {
-//         for (game.tubes, 0..) |*t2, j| {
-//             // if (i != j) {
-//             if (t1.try_transfer(t2, false)) {
-//                 DebugUtils.print("{} {}\n", .{ i, j });
-//             }
-//             // }
-//         }
-//     }
-// }
-
-fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container_policy: ExtractionPolicy) !ArrayList(Move) {
-    var states_to_visit = LinearContainer(struct { Game.GameView, ArrayList(Move) }, container_policy).init(alloc);
+fn searchTreeSolve(alloc: Allocator, gameview: GameView, comptime container_policy: ExtractionPolicy) !ArrayList(Move) {
+    var states_to_visit = LinearContainer(struct { GameView, ArrayList(Move) }, container_policy).init(alloc);
     defer {
         while (states_to_visit.pop()) |elem| {
             var move_list = elem.@"1";
             move_list.deinit(alloc);
         }
     }
-    var known_game_states = HashSet.init(alloc);
+    var known_game_states = HashSet.initContext(alloc, .{ .allocator = alloc });
     defer {
         var iterator = known_game_states.keyIterator();
         while (iterator.next()) |g| {
@@ -120,24 +128,17 @@ fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container
         }
         defer move_list.deinit(alloc);
         for (g.tubes, 0..) |*tube_source, i_source| {
-            var empty_target_tried: bool = false;
             for (g.tubes, 0..) |*tube_target, i_target| {
-                if (tube_target.colorCount() == 0) {
-                    if (tube_source.colorCount() <= 1) {
-                        continue; // pouring the whole content of a tube to an empty tube never makes sense
-                    }
-                    if (empty_target_tried) {
-                        continue; // consider at most one move with empty target per source
-                    }
-                    empty_target_tried = true;
-                }
                 if (move_list.getLastOrNull()) |last_move| {
                     if (i_source == last_move.target) {
                         continue; // never make a move that pours out what was just poured in
                     }
-                }
-                if (tube_source.colorCount() == 1 and tube_target.colorCount() == 1 and i_source > i_target) {
-                    continue; // only pour from lower to higher if the results are equivalent
+                    if (g.tubes[last_move.source].topSegment() == g.tubes[last_move.target].topSegment()) {
+                        // if last move was a partial pour of multiple segments of the same color
+                        if (last_move.source != i_source) {
+                            continue; // partial pour must be continued, otherwise it did not make sense
+                        }
+                    }
                 }
                 if (tube_source.try_transfer(tube_target, false)) {
                     var g_copy = try g.dupe(alloc);
@@ -157,10 +158,10 @@ fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container
     @panic("no solution");
 }
 
-pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
+pub fn bfsSolve(alloc: Allocator, gameview: GameView) !ArrayList(Move) {
     return searchTreeSolve(alloc, gameview, .fifo); // use a queue
 }
 
-pub fn dfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
+pub fn dfsSolve(alloc: Allocator, gameview: GameView) !ArrayList(Move) {
     return searchTreeSolve(alloc, gameview, .lifo); // use a stack
 }

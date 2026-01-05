@@ -31,6 +31,11 @@ pub const Tube = struct {
         } else return null;
     }
 
+    pub fn topSegment(self: Tube) ?Segment {
+        const i_top = self.top() orelse return null;
+        return self.segments[i_top];
+    }
+
     pub fn try_transfer(self: *Tube, other: *Tube, comptime execute: bool) bool {
         if (self == other) return false;
 
