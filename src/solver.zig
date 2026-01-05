@@ -3,48 +3,48 @@ const Game = @import("game.zig");
 const DebugUtils = @import("debug_utils.zig");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
-const HashSet = std.HashMap(Game.GameView, void, Context, std.hash_map.default_max_load_percentage);
+const GameView = Game.GameView;
+const HashSet = std.HashMap(GameView, void, Context, std.hash_map.default_max_load_percentage);
+
 const Context = struct {
+    allocator: Allocator,
+
     // less-than function for sorting
     fn compareTubes(_: void, a: Game.Tube, b: Game.Tube) bool {
         // Lexicographic comparison
-        for (0..Game.Tube.N_SEGMENTS) |i| {
-            if (a.segments[i] < b.segments[i]) return true;
-            if (a.segments[i] > b.segments[i]) return false;
-        }
-        return false; // if all segments are equal
+        for (a.segments, b.segments) |seg_a, seg_b| {
+            if (seg_a < seg_b) return true;
+            if (seg_a > seg_b) return false;
+        } else return false; // if all segments are equal
     }
 
-    pub fn hash(_: Context, gameview: Game.GameView) u64 {
-        var debug_alloc = std.heap.DebugAllocator(.{}).init;
-        defer _ = debug_alloc.deinit();
-        const alloc = debug_alloc.allocator();
-        var gameview_sorted_copy = gameview.dupe(alloc) catch unreachable;
-        defer gameview_sorted_copy.deinit(alloc);
+    pub fn hash(c: Context, gameview: GameView) u64 {
+        var gameview_sorted_copy = gameview.dupe(c.allocator) catch unreachable;
+        defer gameview_sorted_copy.deinit(c.allocator);
+
         std.mem.sort(Game.Tube, gameview_sorted_copy.tubes, {}, compareTubes);
         var hasher = std.hash.Wyhash.init(0);
         std.hash.autoHashStrat(&hasher, gameview_sorted_copy, .Deep);
         return hasher.final();
     }
 
-    pub fn eql(_: Context, gv1: Game.GameView, gv2: Game.GameView) bool {
-        var debug_alloc = std.heap.DebugAllocator(.{}).init;
-        defer _ = debug_alloc.deinit();
-        const alloc = debug_alloc.allocator();
-        var gv1_sorted_copy = gv1.dupe(alloc) catch unreachable;
-        defer gv1_sorted_copy.deinit(alloc);
-        var gv2_sorted_copy = gv2.dupe(alloc) catch unreachable;
-        defer gv2_sorted_copy.deinit(alloc);
+    pub fn eql(c: Context, gv1: GameView, gv2: GameView) bool {
+        var gv1_sorted_copy = gv1.dupe(c.allocator) catch unreachable;
+        defer gv1_sorted_copy.deinit(c.allocator);
+        var gv2_sorted_copy = gv2.dupe(c.allocator) catch unreachable;
+        defer gv2_sorted_copy.deinit(c.allocator);
+
         std.mem.sort(Game.Tube, gv1_sorted_copy.tubes, {}, compareTubes);
         std.mem.sort(Game.Tube, gv2_sorted_copy.tubes, {}, compareTubes);
         for (gv1_sorted_copy.tubes, gv2_sorted_copy.tubes) |t1, t2| {
-            if (!std.mem.eql(Game.Segment, &t1.segments, &t2.segments)) {
+            if (!std.meta.eql(t1, t2)) {
                 return false;
             }
-        }
-        return true;
+        } else return true;
     }
 };
+
+pub const Move = struct { source: usize, target: usize };
 
 pub const ExtractionPolicy = enum { fifo, lifo };
 
@@ -100,31 +100,15 @@ pub fn LinearContainer(comptime T: type, comptime extraction_policy: ExtractionP
     };
 }
 
-pub const Move = struct { source: usize, target: usize };
-
-// pub fn solveGame(game: Game) void {
-//     // var graph = std.AutoHashMap(*Game, std.AutoHashMap(struct { usize, usize }, *Game)).init(game.allocator);
-
-//     for (game.tubes, 0..) |*t1, i| {
-//         for (game.tubes, 0..) |*t2, j| {
-//             // if (i != j) {
-//             if (t1.try_transfer(t2, false)) {
-//                 DebugUtils.print("{} {}\n", .{ i, j });
-//             }
-//             // }
-//         }
-//     }
-// }
-
-fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container_policy: ExtractionPolicy) !ArrayList(Move) {
-    var states_to_visit = LinearContainer(struct { Game.GameView, ArrayList(Move) }, container_policy).init(alloc);
+fn searchTreeSolve(alloc: Allocator, gameview: GameView, comptime container_policy: ExtractionPolicy) !ArrayList(Move) {
+    var states_to_visit = LinearContainer(struct { GameView, ArrayList(Move) }, container_policy).init(alloc);
     defer {
         while (states_to_visit.pop()) |elem| {
             var move_list = elem.@"1";
             move_list.deinit(alloc);
         }
     }
-    var known_game_states = HashSet.init(alloc);
+    var known_game_states = HashSet.initContext(alloc, .{ .allocator = alloc });
     defer {
         var iterator = known_game_states.keyIterator();
         while (iterator.next()) |g| {
@@ -175,10 +159,10 @@ fn searchTreeSolve(alloc: Allocator, gameview: Game.GameView, comptime container
     @panic("no solution");
 }
 
-pub fn bfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
+pub fn bfsSolve(alloc: Allocator, gameview: GameView) !ArrayList(Move) {
     return searchTreeSolve(alloc, gameview, .fifo); // use a queue
 }
 
-pub fn dfsSolve(alloc: Allocator, gameview: Game.GameView) !ArrayList(Move) {
+pub fn dfsSolve(alloc: Allocator, gameview: GameView) !ArrayList(Move) {
     return searchTreeSolve(alloc, gameview, .lifo); // use a stack
 }
