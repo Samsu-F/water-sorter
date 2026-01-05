@@ -11,21 +11,20 @@ const Context = struct {
 
     // less-than function for sorting
     fn compareTubes(_: void, a: Game.Tube, b: Game.Tube) bool {
-        // Lexicographic comparison
-        for (a.segments, b.segments) |seg_a, seg_b| {
-            if (seg_a < seg_b) return true;
-            if (seg_a > seg_b) return false;
-        } else return false; // if all segments are equal
+        return std.mem.lessThan(Game.Segment, &a.segments, &b.segments);
     }
 
-    pub fn hash(c: Context, gameview: GameView) u64 {
-        var gameview_sorted_copy = gameview.dupe(c.allocator) catch unreachable;
-        defer gameview_sorted_copy.deinit(c.allocator);
+    pub fn hash(_: Context, gameview: GameView) u64 {
+        // The overall hash is the XOR of the hashes of all the elements, which
+        // will be consistent no matter the iteration order.
+        var overall_hash: u64 = 0;
+        for (gameview.tubes) |t| {
+            var hasher = std.hash.Wyhash.init(0);
+            std.hash.autoHashStrat(&hasher, t, .Deep);
+            overall_hash ^= hasher.final();
+        }
 
-        std.mem.sort(Game.Tube, gameview_sorted_copy.tubes, {}, compareTubes);
-        var hasher = std.hash.Wyhash.init(0);
-        std.hash.autoHashStrat(&hasher, gameview_sorted_copy, .Deep);
-        return hasher.final();
+        return overall_hash;
     }
 
     pub fn eql(c: Context, gv1: GameView, gv2: GameView) bool {
